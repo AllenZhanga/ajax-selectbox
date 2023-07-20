@@ -66,6 +66,43 @@
 
                         return values;
                     };
+                    
+                    //render the options and update the autocomplate list
+                    var renderOptions = function(field, keyword, data, values) {
+                        var defaultValues = [];
+                        var hasValue = false;
+                        var hasChanges = false;
+                        $(element).empty();
+                        for (var i=0, len=data.length; i < len; i++) {
+                            selectoptions = [];
+                            if ($.inArray(data[i].value, selectoptions) === -1) {
+                                var selected = "";
+                                if ($.inArray(data[i].value, values) !== -1) {
+                                    selected = "selected=\"selected\"";
+                                    hasValue = true;
+                                }
+                                if (data[i].selected !== undefined && data[i].selected.toLowerCase() === "true") {
+                                    defaultValues.push(data[i].value);
+                                }
+                                var option = $("<option "+selected+" >"+UI.escapeHTML(data[i].label)+"</option>");
+                                option.attr("value", data[i].value);
+                                $(element).append(option);
+                                selectoptions.push(data[i].value);
+                                hasChanges = true;
+                            }
+                        }
+                        if (hasChanges && defaultValues.length > 0 && !hasValue) {
+                            for (var dv in defaultValues) {
+                                $(element).find("option[value='"+defaultValues[dv]+"']").attr("selected", "selected");
+                            }
+                        }
+                        if (hasChanges && !$(element).is(".section-visibility-disabled")) {
+                            $('[name='+options.paramName+']:not(form):not(.section-visibility-disabled)').trigger("change");
+                        }
+
+                        $(field).val(keyword);
+                        $(field).css("width", "auto");
+                    };
                         
                     var updateOptions = function(keyword, timeout, field) {
                         var values = getValues(options.paramName);
@@ -87,12 +124,9 @@
                                     params = "?" + params; 
                                 }
                             }
-                            // reset ajaxcalls if not exist in current ajax calls
-                            if ($.inArray(params + "|" + keyword, ajaxcalls) === -1) {
-                                ajaxcalls = [];
-                            }
                             
-                            if ($.inArray(params + "|" + keyword, ajaxcalls) !== -1) {
+                            if (ajaxcalls[params + "|" + keyword] !== undefined){ //if options of a keyword is available, just use it
+                                renderOptions(field, keyword, ajaxcalls[params + "|" + keyword], values);
                                 return;
                             }
                             
@@ -115,41 +149,8 @@
                                     _keyword : keyword
                                 },
                                 success: function(data){
-                                    var defaultValues = [];
-                                    var hasValue = false;
-                                    var hasChanges = false;
-                                    $(element).empty();
-                                    for (var i=0, len=data.length; i < len; i++) {
-                                        selectoptions = [];
-                                        if ($.inArray(data[i].value, selectoptions) === -1) {
-                                            var selected = "";
-                                            if ($.inArray(data[i].value, values) !== -1) {
-                                                selected = "selected=\"selected\"";
-                                                hasValue = true;
-                                            }
-                                            if (data[i].selected !== undefined && data[i].selected.toLowerCase() === "true") {
-                                                defaultValues.push(data[i].value);
-                                            }
-                                            var option = $("<option "+selected+" >"+UI.escapeHTML(data[i].label)+"</option>");
-                                            option.attr("value", data[i].value);
-                                            $(element).append(option);
-                                            selectoptions.push(data[i].value);
-                                            hasChanges = true;
-                                        }
-                                    }
-                                    if (hasChanges && defaultValues.length > 0 && !hasValue) {
-                                        for (var dv in defaultValues) {
-                                            $(element).find("option[value='"+defaultValues[dv]+"']").attr("selected", "selected");
-                                        }
-                                    }
-                                    if (hasChanges && !$(element).is(".section-visibility-disabled")) {
-                                        $('[name='+options.paramName+']:not(form):not(.section-visibility-disabled)').trigger("change");
-                                    }
-                                    
-                                    $(field).val(keyword);
-                                    $(field).css("width", "auto");
-                                    $(element).data('chosen').results_search();
-                                    ajaxcalls.push(params + "|" + keyword);
+                                    ajaxcalls[params + "|" + keyword] = data; //store the options of a keyword for later used
+                                    renderOptions(field, keyword, data, values);
                                     chosenXhr = null;
                                 }
                             });
@@ -175,14 +176,33 @@
                         }
                         
                         if (val.length < options.minTermLength) {
+                            //remove the non selected option when keyword length is 0 to clean the options.
+                            if (val.length === 0) {
+                                var el = $('[name=' + options.paramName + ']').filter("input[type=hidden]:not([disabled=true]), :enabled, [disabled=false]");
+                                if ($(el).is("select")) {
+                                    $(el).find("option:not(:selected)").remove();
+                                } else if ($(el).is("input[type=checkbox], input[type=radio]")) {
+                                    $(el).filter(":not(:checked)").remove();
+                                } 
+                                $(element).append('<option value=""></option>');
+                                $(element).trigger("chosen:updated");
+                            }
                             return false;
                         }
                         
                         updateOptions(val, options.afterTypeDelay, this);
                     });
                     
-                    $(element).on("change", function(){
+                    $(element).on("change", function (){
                         $(".chosen-select").chosen({placeholder_text: getPlaceholder()}); 
+                        if ($(element).val() === "") {
+                            if (!$(chosenContainer).find('.chosen-drop').hasClass("reseted")) {
+                                updateOptions("", options.afterTypeDelay, $(chosenContainer).find('.chosen-search > input'));
+                                $(chosenContainer).find('.chosen-drop').addClass('reseted');
+                            }
+                        } else {
+                            $(chosenContainer).find('.chosen-drop').removeClass('reseted');
+                        }
                         $(element).trigger("chosen:updated");
                     });
                     $(element).on("jsection:hide", function(){

@@ -50,7 +50,7 @@ public class AjaxSelectbox extends SelectBox implements PluginWebSupport, FormBu
 
     @Override
     public String getVersion() {
-        return "7.0.2";
+        return "7.0.5";
     }
 
     @Override
@@ -151,11 +151,14 @@ public class AjaxSelectbox extends SelectBox implements PluginWebSupport, FormBu
             addOptions(options, valueArray, formData, null, null);
         }
         
-        if ((keyword == null || keyword.isEmpty()) && !getPropertyString("defaultOptions").isEmpty()) {
+        if ((keyword == null || keyword.isEmpty())) {
             int number = 0;
-            try {
-                number = Integer.parseInt(getPropertyString("defaultOptions"));
-            } catch (Exception e){}
+            if (!getPropertyString("defaultOptions").isEmpty()) {
+                try {
+                    number = Integer.parseInt(getPropertyString("defaultOptions"));
+                } catch (Exception e) {
+                }
+            }
             addOptions(options, null, formData, null, number);
         }
         
